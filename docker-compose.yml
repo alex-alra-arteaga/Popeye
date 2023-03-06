@@ -1,0 +1,83 @@
+version: "3"
+
+services:
+  poll:
+    build: ./poll
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    ports:
+      - "5000:80"
+    depends_on:
+      - redis
+      - db
+    networks:
+      - poll-tier
+
+  redis:
+    image: redis
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    ports:
+      - "6379:6379"
+    networks:
+      - poll-tier
+      - back-tier
+
+  worker:
+    build: ./worker
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    depends_on:
+      - db
+      - redis
+    networks:
+      - back-tier
+
+  db:
+    image: postgres:11
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+        POSTGRES_DB: postgres
+    networks:
+      - back-tier
+      - result-tier
+
+  result:
+    build: ./result
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    ports:
+      - "5001:80"
+    depends_on:
+      - db
+    networks:
+      - result-tier
+
+networks:
+  poll-tier:
+  back-tier:
+  result-tier:
+
+volumes:
+  db-data:
